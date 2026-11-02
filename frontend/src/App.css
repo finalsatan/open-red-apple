@@ -1,0 +1,133 @@
+:root {
+    color-scheme: dark;
+    font-family: system-ui, "Microsoft YaHei", sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+    margin: 0;
+    height: 100%;
+}
+
+body {
+    background: #121214;
+    color: #e8e8ea;
+}
+
+#App {
+    padding: 20px 24px 40px;
+    min-height: 100%;
+}
+
+.topbar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.topbar h1 {
+    font-size: 20px;
+    margin: 0;
+    white-space: nowrap;
+}
+
+.topbar form {
+    display: flex;
+    gap: 8px;
+    flex: 1;
+    max-width: 460px;
+}
+
+.topbar input {
+    flex: 1;
+    padding: 9px 12px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #1c1c20;
+    color: inherit;
+    outline: none;
+}
+
+.topbar input:focus {
+    border-color: #ff5a3c;
+}
+
+.topbar button {
+    padding: 9px 18px;
+    border-radius: 8px;
+    border: none;
+    background: #ff5a3c;
+    color: #fff;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.topbar button:hover {
+    background: #ff6f55;
+}
+
+.hint {
+    color: #9a9aa2;
+    padding: 8px 0;
+}
+
+.error {
+    color: #ff7b7b;
+    background: #2a1618;
+    border: 1px solid #522;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    word-break: break-all;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 18px;
+}
+
+.card {
+    background: #1b1b1f;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.card img,
+.cover-placeholder {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    display: block;
+    background: #26262c;
+}
+
+.meta {
+    padding: 8px 10px 12px;
+}
+
+.title {
+    font-size: 14px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sub {
+    font-size: 12px;
+    color: #9a9aa2;
+    margin-top: 4px;
+}
