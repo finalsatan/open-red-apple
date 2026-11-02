@@ -1,80 +1,40 @@
-import { useEffect, useState } from 'react';
-import './App.css';
-import { Discover, Search } from '../wailsjs/go/main/App';
-import { dto } from '../wailsjs/go/models';
+import { HashRouter, Route, Routes } from 'react-router-dom';
+import { Sidebar } from './components/Sidebar';
+import { TopBar } from './components/TopBar';
+import DiscoverPage from './pages/Discover';
+import SearchPage from './pages/Search';
+import SeriesDetailPage from './pages/SeriesDetail';
+import RankPage from './pages/Rank';
+import NewReleasesPage from './pages/NewReleases';
+import PersonPage from './pages/Person';
+import FavoritesPage from './pages/Favorites';
+import HistoryPage from './pages/History';
+import SettingsPage from './pages/Settings';
+import PlayPlaceholder from './pages/PlayPlaceholder';
 
-function App() {
-    const [items, setItems] = useState<dto.Series[]>([]);
-    const [query, setQuery] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-
-    async function load(run: () => Promise<dto.SeriesPage>) {
-        setLoading(true);
-        setError('');
-        try {
-            const page = await run();
-            setItems(page.items ?? []);
-        } catch (e) {
-            setError(String(e));
-            setItems([]);
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    useEffect(() => {
-        load(() => Discover(''));
-    }, []);
-
-    function onSearch(e: React.FormEvent) {
-        e.preventDefault();
-        const q = query.trim();
-        if (!q) {
-            load(() => Discover(''));
-            return;
-        }
-        load(() => Search(q));
-    }
-
+export default function App() {
     return (
-        <div id="App">
-            <header className="topbar">
-                <h1>红果短剧</h1>
-                <form onSubmit={onSearch}>
-                    <input
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="搜索短剧…"
-                        autoComplete="off"
-                    />
-                    <button type="submit">搜索</button>
-                </form>
-            </header>
-
-            {error && <div className="error">{error}</div>}
-            {loading && <div className="hint">加载中…</div>}
-            {!loading && !error && items.length === 0 && (
-                <div className="hint">没有结果</div>
-            )}
-
-            <main className="grid">
-                {items.map((s) => (
-                    <article className="card" key={s.id}>
-                        {s.coverUrl ? (
-                            <img src={s.coverUrl} alt={s.title} loading="lazy" />
-                        ) : (
-                            <div className="cover-placeholder" />
-                        )}
-                        <div className="meta">
-                            <div className="title" title={s.title}>{s.title}</div>
-                            <div className="sub">{s.episodeCount} 集</div>
-                        </div>
-                    </article>
-                ))}
-            </main>
-        </div>
+        <HashRouter>
+            <div className="flex h-full">
+                <Sidebar />
+                <div className="flex min-w-0 flex-1 flex-col">
+                    <TopBar />
+                    <main className="flex-1 overflow-y-auto px-6 py-5">
+                        <Routes>
+                            <Route path="/" element={<DiscoverPage />} />
+                            <Route path="/search" element={<SearchPage />} />
+                            <Route path="/series/:id" element={<SeriesDetailPage />} />
+                            <Route path="/play/:seriesId/:episodeId" element={<PlayPlaceholder />} />
+                            <Route path="/rank" element={<RankPage />} />
+                            <Route path="/new" element={<NewReleasesPage />} />
+                            <Route path="/person/:id" element={<PersonPage />} />
+                            <Route path="/favorites" element={<FavoritesPage />} />
+                            <Route path="/history" element={<HistoryPage />} />
+                            <Route path="/settings" element={<SettingsPage />} />
+                        </Routes>
+                    </main>
+                </div>
+            </div>
+        </HashRouter>
     );
 }
-
-export default App;

@@ -47,6 +47,16 @@ func (s *Service) HotSearch(ctx context.Context) (*model.HotSearch, error) {
 	return s.client.HotSearch(ctx)
 }
 
+// SearchCues 加载搜索框里轮播的提示词。
+func (s *Service) SearchCues(ctx context.Context) ([]string, error) {
+	return s.client.SearchCues(ctx)
+}
+
+// NewReleases 加载上新日历的一页。
+func (s *Service) NewReleases(ctx context.Context, q sdk.NewReleaseQuery) (*model.NewReleasePage, error) {
+	return s.client.NewReleases(ctx, q)
+}
+
 // GetSeries 加载一部短剧的详情。
 func (s *Service) GetSeries(ctx context.Context, seriesID string) (*model.Series, error) {
 	return s.client.GetSeries(ctx, seriesID)
@@ -72,9 +82,24 @@ func (s *Service) ShortRank(ctx context.Context, q sdk.ShortRankQuery) (*model.S
 	return s.client.ShortRank(ctx, q)
 }
 
+// ShortFilterPanel 加载短剧筛选面板。
+func (s *Service) ShortFilterPanel(ctx context.Context, genre string) ([]model.FilterRow, error) {
+	return s.client.ShortFilterPanel(ctx, genre)
+}
+
+// ShortFilter 按条件筛选短剧。
+func (s *Service) ShortFilter(ctx context.Context, q sdk.ShortFilterQuery) (*model.ShortFilterPage, error) {
+	return s.client.ShortFilter(ctx, q)
+}
+
 // Person 加载一位演员的主页。
 func (s *Service) Person(ctx context.Context, userID string) (*model.Person, error) {
 	return s.client.Person(ctx, userID)
+}
+
+// PersonWorks 加载一位演员参演的短剧。
+func (s *Service) PersonWorks(ctx context.Context, userID, cursor string) (*model.WorkPage, error) {
+	return s.client.PersonWorks(ctx, userID, cursor)
 }
 
 // ResolvePlayback 加载一集的播放模型。

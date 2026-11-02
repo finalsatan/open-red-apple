@@ -30,3 +30,12 @@ func ProfilePath() (string, error) {
 	}
 	return filepath.Join(dir, "anonymous.json"), nil
 }
+
+// DBPath 返回 SQLite 数据库的路径。
+func DBPath() (string, error) {
+	dir, err := ConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "library.db"), nil
+}
