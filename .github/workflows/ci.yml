@@ -16,7 +16,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -34,7 +34,12 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm ci --no-audit --no-fund
+        run: |
+          npm ci --no-audit --no-fund --loglevel verbose || {
+            echo "===== npm debug log ====="
+            cat "$(ls -t "$HOME"/.npm/_logs/*.log | head -1)" || true
+            exit 1
+          }
 
       - name: Format check
         run: test -z "$(gofmt -l $(git ls-files '*.go'))"
