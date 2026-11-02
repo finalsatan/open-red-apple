@@ -34,12 +34,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: |
-          npm ci --no-audit --no-fund --loglevel verbose || {
-            echo "===== npm debug log ====="
-            cat "$(ls -t "$HOME"/.npm/_logs/*.log | head -1)" || true
-            exit 1
-          }
+        run: npm ci --no-audit --no-fund
 
       - name: Format check
         run: test -z "$(gofmt -l $(git ls-files '*.go'))"
