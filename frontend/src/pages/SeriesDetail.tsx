@@ -149,7 +149,7 @@ export default function SeriesDetailPage() {
                 </h2>
                 <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12">
                     {episodes.map((ep) => (
-                        <Link
+                        ep.playable ? <Link
                             key={ep.id}
                             to={`/play/${series.id}/${ep.id}`}
                             className={`rounded-md py-2 text-center text-sm transition ${
@@ -159,7 +159,7 @@ export default function SeriesDetailPage() {
                             }`}
                         >
                             {ep.number}
-                        </Link>
+                        </Link> : <span key={ep.id} className="cursor-not-allowed rounded-md bg-zinc-900 py-2 text-center text-sm text-zinc-600">{ep.number}</span>
                     ))}
                 </div>
             </section>

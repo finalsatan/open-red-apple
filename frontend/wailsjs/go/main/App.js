@@ -6,6 +6,14 @@ export function AddSearchKeyword(arg1) {
   return window['go']['main']['App']['AddSearchKeyword'](arg1);
 }
 
+export function BeginPlayback() {
+  return window['go']['main']['App']['BeginPlayback']();
+}
+
+export function CancelPlayback(arg1) {
+  return window['go']['main']['App']['CancelPlayback'](arg1);
+}
+
 export function ClearHistory() {
   return window['go']['main']['App']['ClearHistory']();
 }
@@ -60,6 +68,18 @@ export function Person(arg1) {
 
 export function PersonWorks(arg1, arg2) {
   return window['go']['main']['App']['PersonWorks'](arg1, arg2);
+}
+
+export function PlayURL(arg1) {
+  return window['go']['main']['App']['PlayURL'](arg1);
+}
+
+export function PlayURLForRequest(arg1, arg2) {
+  return window['go']['main']['App']['PlayURLForRequest'](arg1, arg2);
+}
+
+export function ReleasePlayback(arg1) {
+  return window['go']['main']['App']['ReleasePlayback'](arg1);
 }
 
 export function ResetDevice() {

@@ -1,6 +1,9 @@
 build/bin
 build/windows/installer/tmp/
 node_modules
+frontend/test-results/
+frontend/playwright-report/
+/cmd/webview-smoke/fixtures/generated/
 frontend/dist/*
 !frontend/dist/gitkeep
 dist/

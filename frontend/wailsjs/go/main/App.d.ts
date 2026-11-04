@@ -4,6 +4,10 @@ import {dto} from '../models';
 
 export function AddSearchKeyword(arg1:string):Promise<void>;
 
+export function BeginPlayback():Promise<string>;
+
+export function CancelPlayback(arg1:string):Promise<void>;
+
 export function ClearHistory():Promise<void>;
 
 export function ClearSearchHistory():Promise<void>;
@@ -31,6 +35,12 @@ export function NewReleases(arg1:string,arg2:string):Promise<dto.NewReleasePage>
 export function Person(arg1:string):Promise<dto.Person>;
 
 export function PersonWorks(arg1:string,arg2:string):Promise<dto.WorkPage>;
+
+export function PlayURL(arg1:string):Promise<string>;
+
+export function PlayURLForRequest(arg1:string,arg2:string):Promise<string>;
+
+export function ReleasePlayback(arg1:string):Promise<void>;
 
 export function ResetDevice():Promise<void>;
 

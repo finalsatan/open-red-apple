@@ -1,5 +1,6 @@
 // 把 Wails 抛出的错误字符串转成可读文案。
 const MESSAGES: Array<[string, string]> = [
+    ['context deadline exceeded', '请求超时，请检查网络后重试'],
     ['RATE_LIMITED', '请求太频繁，请稍后再试'],
     ['ANONYMOUS_LIMITED', '服务端没有返回内容，请重试'],
     ['CONTENT_UNAVAILABLE', '内容已下架或不可用'],

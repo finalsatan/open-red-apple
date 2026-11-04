@@ -1,4 +1,4 @@
-import { HashRouter, Route, Routes } from 'react-router-dom';
+import { HashRouter, Route, Routes, useParams } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import DiscoverPage from './pages/Discover';
@@ -12,6 +12,11 @@ import HistoryPage from './pages/History';
 import SettingsPage from './pages/Settings';
 import PlayPlaceholder from './pages/PlayPlaceholder';
 
+function PlayRoute() {
+    const { seriesId, episodeId } = useParams();
+    return <PlayPlaceholder key={`${seriesId}/${episodeId}`} />;
+}
+
 export default function App() {
     return (
         <HashRouter>
@@ -24,7 +29,7 @@ export default function App() {
                             <Route path="/" element={<DiscoverPage />} />
                             <Route path="/search" element={<SearchPage />} />
                             <Route path="/series/:id" element={<SeriesDetailPage />} />
-                            <Route path="/play/:seriesId/:episodeId" element={<PlayPlaceholder />} />
+                            <Route path="/play/:seriesId/:episodeId" element={<PlayRoute />} />
                             <Route path="/rank" element={<RankPage />} />
                             <Route path="/new" element={<NewReleasesPage />} />
                             <Route path="/person/:id" element={<PersonPage />} />

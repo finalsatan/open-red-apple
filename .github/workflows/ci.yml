@@ -43,7 +43,27 @@ jobs:
         run: go vet ./...
 
       - name: Test
-        run: go test -short ./internal/...
+        run: go test -short ./...
+
+      - name: Install browser test dependencies
+        working-directory: frontend
+        run: |
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          npx playwright install --with-deps chromium
+
+      - name: Test playback in Chromium
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - name: Test WebView2 smoke driver with local Chromium
+        working-directory: frontend
+        run: node tests/run-webview2-smoke.mjs --simulate
+
+      - name: Test media remux
+        run: go test ./internal/gateway
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@$WAILS_VERSION
@@ -56,3 +76,51 @@ jobs:
           name: win-red-apple-windows-amd64
           path: build/bin/win-red-apple.exe
           if-no-files-found: error
+
+  windows-tests:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Test backend on Windows
+        run: go test -short ./...
+
+      - name: Install FFmpeg
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+            choco install ffmpeg --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            "$env:ChocolateyInstall\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          }
+
+      - name: Test media remux on Windows
+        shell: pwsh
+        run: |
+          ffmpeg -version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -v ./internal/gateway
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install chromium
+
+      - name: Test playback in Chromium on Windows
+        working-directory: frontend
+        run: npm run test:e2e

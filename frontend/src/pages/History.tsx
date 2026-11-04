@@ -30,7 +30,7 @@ export default function HistoryPage() {
                 return (
                     <Link
                         key={h.seriesId}
-                        to={`/series/${h.seriesId}`}
+                        to={`/play/${h.seriesId}/${h.episodeId}`}
                         className="flex gap-4 rounded-lg p-2 hover:bg-zinc-800"
                     >
                         <Cover

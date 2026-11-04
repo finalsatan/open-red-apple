@@ -2,11 +2,21 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"strings"
+	"sync"
+	"time"
 
+	"github.com/beilunyang/openhongguo/adapters"
+	"github.com/beilunyang/openhongguo/adapters/memstore"
 	"github.com/beilunyang/openhongguo/sdk"
+	"github.com/beilunyang/openhongguo/sdk/model"
 
 	"github.com/finalsatan/open-red-apple/internal/dto"
+	"github.com/finalsatan/open-red-apple/internal/gateway"
 	"github.com/finalsatan/open-red-apple/internal/ohg"
 	"github.com/finalsatan/open-red-apple/internal/paths"
 	"github.com/finalsatan/open-red-apple/internal/store"
@@ -14,10 +24,30 @@ import (
 
 // App 持有 Wails 上下文、SDK 门面和本地存储。
 type App struct {
+	ctx          context.Context
+	svc          *ohg.Service
+	store        *store.Store
+	initErr      error
+	media        *gateway.Gateway
+	playClient   playbackClient
+	playGateOnce sync.Once
+	playGate     chan struct{}
+	requestMu    sync.Mutex
+	playRequests map[string]*playRequest
+	playClosing  bool
+}
+
+type playRequest struct {
 	ctx     context.Context
-	svc     *ohg.Service
-	store   *store.Store
-	initErr error
+	cancel  context.CancelFunc
+	claimed bool
+}
+
+// playbackClient is kept separate from the browsing client because anonymous
+// devices can be consumed by a playback lookup.
+type playbackClient interface {
+	ResolvePlayback(context.Context, string, sdk.PlaybackOptions) (*model.Playback, error)
+	ResetDevice(context.Context) error
 }
 
 // NewApp 创建 App，并初始化 SDK 客户端与数据库。
@@ -34,7 +64,11 @@ func NewApp() *App {
 		return a
 	}
 	a.svc = svc
-
+	a.playClient, err = adapters.NewClient("", sdk.Options{ProfileStore: memstore.New(), RetryAttempts: 3})
+	if err != nil {
+		a.initErr = err
+		return a
+	}
 	dbPath, err := paths.DBPath()
 	if err != nil {
 		a.initErr = fmt.Errorf("resolve db path: %w", err)
@@ -46,6 +80,13 @@ func NewApp() *App {
 		return a
 	}
 	a.store = st
+	a.media, err = gateway.New()
+	if err != nil {
+		_ = st.Close()
+		a.store = nil
+		a.initErr = fmt.Errorf("start media gateway: %w", err)
+		return a
+	}
 	return a
 }
 
@@ -56,9 +97,197 @@ func (a *App) startup(ctx context.Context) {
 
 // shutdown 由 Wails 在退出时调用。
 func (a *App) shutdown(ctx context.Context) {
+	a.requestMu.Lock()
+	a.playClosing = true
+	for _, request := range a.playRequests {
+		request.cancel()
+	}
+	a.playRequests = nil
+	a.requestMu.Unlock()
+	if a.media != nil {
+		_ = a.media.Close()
+	}
 	if a.store != nil {
 		_ = a.store.Close()
 	}
+}
+
+// PlayURL resolves a clear stream and returns a local URL.
+func (a *App) PlayURL(episodeID string) (string, error) {
+	if err := a.ready(); err != nil {
+		return "", err
+	}
+	return a.playURL(a.context(), episodeID)
+}
+
+// BeginPlayback creates a cancellable preparation request for the player.
+func (a *App) BeginPlayback() (string, error) {
+	if err := a.ready(); err != nil {
+		return "", err
+	}
+	var raw [24]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		return "", err
+	}
+	id := hex.EncodeToString(raw[:])
+	ctx, cancel := context.WithTimeout(a.context(), 2*time.Minute)
+	request := &playRequest{ctx: ctx, cancel: cancel}
+	a.requestMu.Lock()
+	if a.playClosing {
+		a.requestMu.Unlock()
+		cancel()
+		return "", fmt.Errorf("应用正在关闭")
+	}
+	if a.playRequests == nil {
+		a.playRequests = make(map[string]*playRequest)
+	}
+	a.playRequests[id] = request
+	a.requestMu.Unlock()
+	go func() { <-ctx.Done(); a.removePlaybackRequest(id, request) }()
+	return id, nil
+}
+
+// CancelPlayback stops a pending request, including one waiting for the device.
+func (a *App) CancelPlayback(id string) {
+	a.requestMu.Lock()
+	request := a.playRequests[id]
+	if request != nil {
+		delete(a.playRequests, id)
+	}
+	a.requestMu.Unlock()
+	if request != nil {
+		request.cancel()
+	}
+}
+
+func (a *App) removePlaybackRequest(id string, request *playRequest) {
+	a.requestMu.Lock()
+	if a.playRequests[id] == request {
+		delete(a.playRequests, id)
+	}
+	a.requestMu.Unlock()
+}
+
+// PlayURLForRequest resolves a stream while the preparation request remains active.
+func (a *App) PlayURLForRequest(episodeID, requestID string) (string, error) {
+	if err := a.ready(); err != nil {
+		return "", err
+	}
+	a.requestMu.Lock()
+	request := a.playRequests[requestID]
+	if request != nil {
+		if request.claimed {
+			request = nil
+		} else {
+			request.claimed = true
+		}
+	}
+	a.requestMu.Unlock()
+	if request == nil {
+		return "", context.Canceled
+	}
+	defer func() { a.removePlaybackRequest(requestID, request); request.cancel() }()
+	return a.playURL(request.ctx, episodeID)
+}
+
+func (a *App) playURL(ctx context.Context, episodeID string) (string, error) {
+	p, err := a.resolvePlayback(ctx, episodeID)
+	if err != nil {
+		return "", err
+	}
+	if p.Protected {
+		return "", fmt.Errorf("此分集为加密资源，暂不支持播放")
+	}
+	stream, err := selectClearStream(p)
+	if err != nil {
+		return "", fmt.Errorf("此分集没有可用的清晰播放资源")
+	}
+	if p.AudioURL != "" {
+		return a.media.RegisterMux(ctx, stream.URL, stream.BackupURL, p.AudioURL, stream.HLS, p.DurationSeconds)
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	return a.media.RegisterStream(stream.URL, stream.BackupURL, stream.HLS)
+}
+
+func (a *App) acquirePlayback(ctx context.Context) error {
+	a.playGateOnce.Do(func() { a.playGate = make(chan struct{}, 1) })
+	select {
+	case a.playGate <- struct{}{}:
+		if err := ctx.Err(); err != nil {
+			<-a.playGate
+			return err
+		}
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (a *App) resolvePlayback(ctx context.Context, episodeID string) (*model.Playback, error) {
+	if err := a.acquirePlayback(ctx); err != nil {
+		return nil, err
+	}
+	defer func() { <-a.playGate }()
+	var last error
+	for i := 0; i < 3; i++ {
+		p, err := a.playClient.ResolvePlayback(ctx, episodeID, sdk.PlaybackOptions{})
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if errors.Is(err, sdk.ErrDRMProtected) {
+			return nil, fmt.Errorf("此分集为加密资源，暂不支持播放")
+		}
+		if errors.Is(err, sdk.ErrAnonymousLimited) {
+			last = err
+			if i < 2 {
+				if err = a.playClient.ResetDevice(ctx); err != nil {
+					if ctx.Err() != nil {
+						return nil, ctx.Err()
+					}
+					return nil, err
+				}
+			}
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if p == nil {
+			return nil, fmt.Errorf("未找到播放资源")
+		}
+		return p, nil
+	}
+	return nil, fmt.Errorf("匿名设备暂时无法获取播放资源，请稍后重试：%w", last)
+}
+
+// ReleasePlayback stops resources owned by a playback URL when leaving the player.
+func (a *App) ReleasePlayback(url string) {
+	if a.media != nil {
+		a.media.Release(url)
+	}
+}
+
+// Prefer H.264 where offered: WebView2 support for HEVC depends on the system.
+func selectClearStream(p *model.Playback) (model.Stream, error) {
+	filtered := *p
+	filtered.Streams = nil
+	var h264 []model.Stream
+	for _, stream := range p.Streams {
+		if stream.Protected || (stream.Dash && p.AudioURL == "") || strings.TrimSpace(stream.URL) == "" {
+			continue
+		}
+		filtered.Streams = append(filtered.Streams, stream)
+		codec := strings.ToLower(stream.Codec)
+		if codec == "h264" || codec == "h.264" || codec == "avc" || strings.HasPrefix(codec, "avc1") {
+			h264 = append(h264, stream)
+		}
+	}
+	if len(h264) > 0 {
+		filtered.Streams = h264
+	}
+	return filtered.Select("")
 }
 
 func (a *App) context() context.Context {
@@ -294,7 +523,15 @@ func (a *App) ResetDevice() error {
 	if err := a.ready(); err != nil {
 		return err
 	}
-	return a.svc.ResetDevice(a.context())
+	if err := a.svc.ResetDevice(a.context()); err != nil {
+		return err
+	}
+	ctx := a.context()
+	if err := a.acquirePlayback(ctx); err != nil {
+		return err
+	}
+	defer func() { <-a.playGate }()
+	return a.playClient.ResetDevice(ctx)
 }
 
 // --- 本地库：搜索记录 / 收藏 / 观看记录 ---
